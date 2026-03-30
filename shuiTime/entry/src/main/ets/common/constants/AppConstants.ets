@@ -1,0 +1,10 @@
+export const APP_NAMESPACE: string = 'shuiTime';
+export const DATA_ROOT_DIR: string = `${APP_NAMESPACE}/data`;
+export const MEDIA_ROOT_DIR: string = `${APP_NAMESPACE}/media`;
+export const TEMP_ROOT_DIR: string = `${APP_NAMESPACE}/temp`;
+export const ITEM_STORE_FILE_NAME: string = 'timeline-items.json';
+export const IOS_BACKUP_JSON_FILE_NAME: string = 'shuiTime_backup.json';
+export const BACKUP_FILE_PREFIX: string = 'shuiTime_backup_';
+export const BACKUP_FILE_VERSION: string = '1.0';
+export const DEFAULT_ICON_NAME: string = 'circle.fill';
+export const MAX_MOMENTS_PER_DAY: number = 3;
