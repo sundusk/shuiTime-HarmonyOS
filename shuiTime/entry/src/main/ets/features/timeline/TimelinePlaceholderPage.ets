@@ -1,21 +1,47 @@
-import { getTimelineRepository, initializeAppBootstrap } from '../../app/AppBootstrap';
-import { getDayRange } from '../../common/utils/DateUtils';
-import { generateId } from '../../common/utils/IdUtils';
 import { TimelineItemEntity } from '../../data/model/TimelineItemEntity';
+import { getTimelineRepository, initializeAppBootstrap } from '../../app/AppBootstrap';
 
 @Component
 export struct TimelinePlaceholderPage {
-  private readonly composerInputId: string = 'timeline-composer-input';
-
-  @State private dayItems: TimelineItemEntity[] = [];
-  @State private isLoading: boolean = true;
-  @State private isComposerVisible: boolean = false;
-  @State private draftContent: string = '';
-  @State private isSaving: boolean = false;
-  @State private composerFocused: boolean = false;
+  @Link items: TimelineItemEntity[];
+  @Prop isLoading: boolean = true;
 
   aboutToAppear(): void {
-    this.loadTodayItems();
+    console.log('TimelinePlaceholderPage: aboutToAppear, items count:', this.items.length);
+    if (this.items.length === 0) {
+      this.loadTodayItems();
+    }
+  }
+
+  aboutToUpdate(): void {
+    console.log('TimelinePlaceholderPage: aboutToUpdate, 外部数据长度:', this.items.length, 'isLoading:', this.isLoading);
+  }
+
+  private async loadTodayItems(): Promise<void> {
+    console.log('开始加载今日记录...');
+    
+    try {
+      const context = this.getUIContext().getHostContext();
+      if (!context) {
+        throw new Error('无法获取应用上下文');
+      }
+      await initializeAppBootstrap(context.filesDir);
+      const loadedItems = await getTimelineRepository().listAll();
+      
+      loadedItems.sort((a: TimelineItemEntity, b: TimelineItemEntity) => b.timestamp - a.timestamp);
+      
+      console.log('加载到', loadedItems.length, '条记录');
+      if (loadedItems.length > 0) {
+        console.log('第一条记录内容:', loadedItems[0].content);
+      }
+      
+      // 直接更新父组件数据源
+      this.items = [...loadedItems];
+      
+    } catch (error) {
+      console.error('加载时间线失败:', error);
+      this.items = [];
+    }
   }
 
   build() {
@@ -29,13 +55,13 @@ export struct TimelinePlaceholderPage {
           Blank()
             .layoutWeight(1);
 
-          Text('正在加载今日记录...')
+          Text('正在加载时间线...')
             .fontSize(16)
             .fontColor('#8E95A3');
 
           Blank()
             .layoutWeight(1);
-        } else if (this.dayItems.length === 0) {
+        } else if (this.items.length === 0) {
           Blank()
             .layoutWeight(3);
 
@@ -44,10 +70,8 @@ export struct TimelinePlaceholderPage {
           Blank()
             .layoutWeight(4);
         } else {
-          this.buildTimelineList();
+          this.buildTimelineList(this.items);
         }
-
-        this.buildBottomBar();
       }
       .width('100%')
       .height('100%')
@@ -88,17 +112,10 @@ export struct TimelinePlaceholderPage {
     Row() {
       this.buildCircleActionButton('menu');
 
-      Row({ space: 6 }) {
-        Text('今日')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#232833');
-
-        Text('▼')
-          .fontSize(9)
-          .fontColor('#7F8796')
-          .margin({ top: 4 });
-      }
+      Text('时间线')
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#232833');
 
       this.buildCircleActionButton('search');
     }
@@ -147,7 +164,7 @@ export struct TimelinePlaceholderPage {
     Column({ space: 18 }) {
       this.buildEmptyIcon();
 
-      Text('这一天没有记录')
+      Text('还没有任何记录')
         .fontSize(17)
         .fontColor('#B0B5BE');
     }
@@ -218,149 +235,167 @@ export struct TimelinePlaceholderPage {
   }
 
   @Builder
-  private buildTimelineList() {
-    Scroll() {
-      Column({ space: 14 }) {
-        ForEach(this.dayItems, (item: TimelineItemEntity) => {
-          this.buildTimelineCard(item);
-        }, (item: TimelineItemEntity): string => item.id);
-      }
-      .width('100%')
-      .padding({ left: 20, right: 20, top: 24, bottom: 24 });
+  private buildTimelineList(items: TimelineItemEntity[]) {
+    List({ space: 20 }) {
+      ForEach(items, (item: TimelineItemEntity, index: number) => {
+        ListItem() {
+          this.buildTimelineListItem(items, item, index);
+        }
+        .id(item.id) // 添加唯一ID帮助ForEach识别变化
+      }, (item: TimelineItemEntity) => item.id)
     }
+    .width('100%')
     .layoutWeight(1)
+    .padding({ left: 20, right: 20, top: 24, bottom: 24 })
     .scrollBar(BarState.Off);
   }
 
   @Builder
-  private buildTimelineCard(item: TimelineItemEntity) {
-    Column({ space: 10 }) {
-      Row() {
-        Text(this.formatTypeLabel(item.type))
-          .fontSize(12)
-          .fontColor('#4A7DFF')
-          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-          .backgroundColor('#EAF1FF')
-          .borderRadius(12);
-
-        Blank();
-
-        Text(this.formatTime(item.timestamp))
-          .fontSize(13)
-          .fontColor('#9AA1AD');
+  private buildTimelineListItem(items: TimelineItemEntity[], item: TimelineItemEntity, index: number) {
+    Column({ space: 12 }) {
+      if (this.shouldShowDayHeader(items, index)) {
+        Text(this.formatDayLabel(this.getDayKey(item.timestamp)))
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#7F8796')
+          .width('100%');
       }
-      .width('100%');
 
-      Text(item.content && item.content.length > 0 ? item.content : '图片记录')
-        .fontSize(17)
-        .fontColor('#1F2430')
-        .lineHeight(24)
+      this.buildTimelineCard(item, this.isLastItemOfDay(items, index));
+    }
+    .width('100%');
+  }
+
+  @Builder
+  private buildTimelineCard(item: TimelineItemEntity, isLast: boolean) {
+    Row({ space: 12 }) {
+      Column() {
+        Row() {}
+          .width(2)
+          .height(14)
+          .backgroundColor('#C9DAFF');
+
+        this.buildTimelineNode(item.type);
+
+        if (!isLast) {
+          Row() {}
+            .width(2)
+            .height(54)
+            .backgroundColor('#C9DAFF');
+        } else {
+          Blank()
+            .height(18);
+        }
+      }
+      .width(22)
+      .alignItems(HorizontalAlign.Center);
+
+      Column({ space: 10 }) {
+        Row() {
+          Text(this.formatTime(item.timestamp))
+            .fontSize(13)
+            .fontColor('#8D96A5');
+
+          Blank();
+
+          Text(this.formatTypeLabel(item.type))
+            .fontSize(11)
+            .fontColor(this.getTypeColor(item.type))
+            .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+            .backgroundColor(this.getTypeBackgroundColor(item.type))
+            .borderRadius(10);
+        }
         .width('100%');
-    }
-    .width('100%')
-    .padding(18)
-    .backgroundColor('#FFFFFFE8')
-    .borderRadius(22);
-  }
 
-  @Builder
-  private buildBottomBar() {
-    Row() {
-      if (this.isComposerVisible) {
-        this.buildComposerBar();
-      } else {
-        Blank();
-        // 悬浮球已移到全局，这里不再显示
+        Text(this.getDisplayContent(item))
+          .fontSize(16)
+          .fontColor('#1F2430')
+          .lineHeight(23)
+          .width('100%');
       }
+      .layoutWeight(1)
+      .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+      .backgroundColor('#FFFFFFE8')
+      .borderRadius(18)
+      .shadow({
+        radius: 12,
+        color: '#12000000',
+        offsetX: 0,
+        offsetY: 6
+      });
     }
     .width('100%')
-    .padding({ left: 16, right: 16, bottom: 20 })
-    .zIndex(100);
+    .alignItems(VerticalAlign.Top);
   }
 
   @Builder
-  private buildComposerBar() {
-    Row({ space: 10 }) {
-      this.buildComposerSideButton('想');
-      this.buildComposerSideButton('图');
+  private buildTimelineNode(type: string) {
+    if (type === 'moment') {
+      Stack() {
+        Circle()
+          .width(18)
+          .height(18)
+          .fill('#EAF2FF');
 
-      TextInput({ placeholder: '记录此刻...', text: this.draftContent })
-        .id(this.composerInputId)
-        .type(InputType.Normal)
-        .enterKeyType(EnterKeyType.Send)
-        .focusable(true)
-        .defaultFocus(this.composerFocused)
-        .fontSize(16)
-        .fontColor('#2A3040')
-        .placeholderColor('#A0A6B4')
-        .caretColor('#4A7DFF')
-        .backgroundColor('#EEF1F7')
-        .borderRadius(18)
-        .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-        .layoutWeight(1)
-        .onChange((value: string) => {
-          this.draftContent = value;
-        })
-        .onSubmit((_enterKey: EnterKeyType) => {
-          this.submitComposer();
-        });
+        Circle()
+          .width(18)
+          .height(18)
+          .stroke('#4A7DFF')
+          .strokeWidth(1.5);
 
-      this.buildComposerActionButton(this.canSubmitComposer() ? '发' : '收');
-    }
-    .width('100%')
-    .padding({ left: 12, right: 10, top: 10, bottom: 10 })
-    .backgroundColor('#FFFFFFF2')
-    .borderRadius(24)
-    .zIndex(100);
-  }
-
-  @Builder
-  private buildComposerSideButton(label: string) {
-    Stack() {
-      Text(label)
-        .fontSize(14)
-        .fontWeight(FontWeight.Medium)
-        .fontColor('#8C93A1');
-    }
-    .width(24)
-    .height(24)
-    .borderRadius(12)
-    .backgroundColor('#F4F6FA');
-  }
-
-  @Builder
-  private buildComposerActionButton(label: string) {
-    Stack() {
-      Text(label)
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(this.canSubmitComposer() ? '#4A7DFF' : '#8F97A6');
-    }
-    .width(28)
-    .height(28)
-    .borderRadius(14)
-    .backgroundColor(this.canSubmitComposer() ? '#EAF1FF' : '#F3F5F8')
-    .onClick(() => {
-      if (this.canSubmitComposer()) {
-        this.submitComposer();
-        return;
+        Circle()
+          .width(8)
+          .height(8)
+          .fill('#4A7DFF');
       }
-      this.closeComposer();
-    });
+      .margin({ top: 4, bottom: 4 });
+    } else {
+      Circle()
+        .width(10)
+        .height(10)
+        .fill(type === 'inspiration' ? '#FFBF47' : '#4A7DFF')
+        .stroke('#F8FAFD')
+        .strokeWidth(2)
+        .margin({ top: 4, bottom: 4 });
+    }
   }
 
-  private async loadTodayItems(): Promise<void> {
-    this.isLoading = true;
-    try {
-      const currentContext = getContext(this);
-      await initializeAppBootstrap(currentContext.filesDir);
-      const range = getDayRange(Date.now());
-      this.dayItems = await getTimelineRepository().listByDate(range.start, range.end);
-    } catch (_) {
-      this.dayItems = [];
-    } finally {
-      this.isLoading = false;
+  private shouldShowDayHeader(items: TimelineItemEntity[], index: number): boolean {
+    if (index === 0) {
+      return true;
     }
+    return this.getDayKey(items[index - 1].timestamp) !== this.getDayKey(items[index].timestamp);
+  }
+
+  private isLastItemOfDay(items: TimelineItemEntity[], index: number): boolean {
+    if (index >= items.length - 1) {
+      return true;
+    }
+    return this.getDayKey(items[index].timestamp) !== this.getDayKey(items[index + 1].timestamp);
+  }
+
+  private getDayKey(timestamp: number): string {
+    const date = new Date(timestamp);
+    const year = `${date.getFullYear()}`;
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private formatDayLabel(dayKey: string): string {
+    const parts = dayKey.split('-');
+    const year = parts[0];
+    const month = parts[1];
+    const day = parts[2];
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+    const todayKey = this.getDayKey(Date.now());
+
+    if (dayKey === todayKey) {
+      return '今日';
+    }
+
+    return `${year}年${month}月${day}日 ${weekday}`;
   }
 
   private formatTypeLabel(type: string): string {
@@ -373,49 +408,40 @@ export struct TimelinePlaceholderPage {
     return '时间线';
   }
 
+  private getTypeColor(type: string): string {
+    if (type === 'moment') {
+      return '#4A7DFF';
+    }
+    if (type === 'inspiration') {
+      return '#C48912';
+    }
+    return '#4A7DFF';
+  }
+
+  private getTypeBackgroundColor(type: string): string {
+    if (type === 'moment') {
+      return '#EAF1FF';
+    }
+    if (type === 'inspiration') {
+      return '#FFF4D9';
+    }
+    return '#EAF1FF';
+  }
+
+  private getDisplayContent(item: TimelineItemEntity): string {
+    if (item.content && item.content.trim().length > 0) {
+      return item.content;
+    }
+    if (item.type === 'moment') {
+      return '图片记录';
+    }
+    return '空白记录';
+  }
+
   private formatTime(timestamp: number): string {
     const date = new Date(timestamp);
     const hour = `${date.getHours()}`.padStart(2, '0');
     const minute = `${date.getMinutes()}`.padStart(2, '0');
     return `${hour}:${minute}`;
-  }
-
-  public openComposer(): void {
-    console.log('打开输入框，设置可见性为 true');
-    this.isComposerVisible = true;
-    this.composerFocused = true;
-  }
-
-  private closeComposer(): void {
-    this.isComposerVisible = false;
-    this.draftContent = '';
-    this.composerFocused = false;
-  }
-
-  private canSubmitComposer(): boolean {
-    return !this.isSaving && this.draftContent.trim().length > 0;
-  }
-
-  private async submitComposer(): Promise<void> {
-    const content = this.draftContent.trim();
-    if (this.isSaving || content.length === 0) {
-      return;
-    }
-
-    this.isSaving = true;
-    try {
-      const createdItem = await getTimelineRepository().create({
-        id: generateId(),
-        timestamp: Date.now(),
-        content,
-        iconName: '',
-        type: 'timeline',
-        isLivePhoto: false
-      });
-      this.dayItems = [createdItem, ...this.dayItems];
-      this.closeComposer();
-    } finally {
-      this.isSaving = false;
-    }
   }
 }

@@ -18,40 +18,64 @@ export class FileStorage {
     });
   }
   writeText(path: string, content: string): void {
+    console.log('FileStorage.writeText: 开始写入文件:', path);
     this.ensureDir(path.substring(0, path.lastIndexOf('/')));
-    if (fs.accessSync(path)) {
-      fs.unlinkSync(path);
-    }
-    const file = fs.openSync(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
+
     try {
-      const encoder = new util.TextEncoder();
-      fs.writeSync(file.fd, encoder.encodeInto(content));
-    } finally {
-      fs.closeSync(file);
+      console.log('FileStorage.writeText: 打开目标文件并清空旧内容');
+      const file = fs.openSync(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.SYNC);
+
+      try {
+        console.log('FileStorage.writeText: 写入内容，长度:', content.length);
+        const writeResult = fs.writeSync(file.fd, content);
+        console.log('FileStorage.writeText: 写入成功，写入字节数:', writeResult);
+        fs.fsyncSync(file.fd);
+      } finally {
+        fs.closeSync(file);
+        console.log('FileStorage.writeText: 文件已关闭');
+      }
+      console.log('FileStorage.writeText: 写入完成');
+    } catch (error) {
+      console.error('FileStorage.writeText: 写入失败:', error);
+      throw new Error('写入文件失败');
     }
   }
   readText(path: string): string {
+    console.log('FileStorage.readText: 开始读取文件:', path);
     if (!fs.accessSync(path)) {
+      console.log('FileStorage.readText: 文件不存在');
       return '';
     }
 
-    const file = fs.openSync(path, fs.OpenMode.READ_WRITE);
     try {
-      const stat = fs.statSync(path);
-      if (stat.size <= 0) {
-        return '';
-      }
+      const file = fs.openSync(path, fs.OpenMode.READ_ONLY);
 
-      const buffer = new ArrayBuffer(stat.size);
-      const options: ReadOptions = {
-        offset: 0,
-        length: stat.size
-      };
-      const readLength = fs.readSync(file.fd, buffer, options);
-      const decoder = new util.TextDecoder();
-      return decoder.decode(new Uint8Array(buffer, 0, readLength));
-    } finally {
-      fs.closeSync(file);
+      try {
+        const stat = fs.statSync(path);
+        console.log('FileStorage.readText: 文件大小:', stat.size);
+
+        if (stat.size <= 0) {
+          throw new Error(`文件为空: ${path}`);
+        }
+
+        const buffer = new ArrayBuffer(stat.size);
+        const options: ReadOptions = {
+          offset: 0,
+          length: stat.size
+        };
+        const readLength = fs.readSync(file.fd, buffer, options);
+        console.log('FileStorage.readText: 读取字节数:', readLength);
+
+        const decoder = new util.TextDecoder();
+        const result = decoder.decode(new Uint8Array(buffer, 0, readLength));
+        console.log('FileStorage.readText: 读取内容长度:', result.length);
+        return result;
+      } finally {
+        fs.closeSync(file);
+      }
+    } catch (error) {
+      console.error('FileStorage.readText: 读取失败:', error);
+      throw new Error('读取文件失败');
     }
   }
   writeBytes(path: string, content: Uint8Array): void {

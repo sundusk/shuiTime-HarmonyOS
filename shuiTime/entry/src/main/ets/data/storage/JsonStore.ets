@@ -19,43 +19,83 @@ export class JsonStore {
     this.fileStorage.ensureDir(this.storagePaths.tempRootDir);
 
     if (!this.fileStorage.exists(this.storagePaths.itemStorePath)) {
-      this.persist({
-        schemaVersion: CURRENT_SCHEMA_VERSION,
-        updatedAt: Date.now(),
-        items: []
-      });
+      this.persistStore(this.createEmptyStoreData());
     }
   }
 
   async load(): Promise<TimelineStoreData> {
-    const raw = this.fileStorage.readText(this.storagePaths.itemStorePath);
-    if (!raw) {
-      const emptyStore: TimelineStoreData = {
-        schemaVersion: CURRENT_SCHEMA_VERSION,
-        updatedAt: Date.now(),
-        items: []
-      } as TimelineStoreData;
-      this.persist(emptyStore);
+    console.log('JsonStore.load: 开始加载数据');
+    if (!this.fileStorage.exists(this.storagePaths.itemStorePath)) {
+      console.log('JsonStore.load: 没有数据文件，创建空存储');
+      const emptyStore = this.createEmptyStoreData();
+      this.persistStore(emptyStore);
       return emptyStore;
     }
 
-    const parsed = JSON.parse(raw) as TimelineStoreData;
-    return {
-      schemaVersion: parsed.schemaVersion ?? CURRENT_SCHEMA_VERSION,
-      updatedAt: parsed.updatedAt ?? Date.now(),
-      items: Array.isArray(parsed.items) ? parsed.items : []
-    };
+    try {
+      return this.loadFromPath(this.storagePaths.itemStorePath, '主存储');
+    } catch (primaryError) {
+      console.error('JsonStore.load: 主存储读取失败，尝试从备份恢复', primaryError);
+
+      if (!this.fileStorage.exists(this.storagePaths.itemStoreBackupPath)) {
+        throw new Error('主存储读取失败，且没有可用备份');
+      }
+
+      const backupStore = this.loadFromPath(this.storagePaths.itemStoreBackupPath, '备份存储');
+      this.persistToPath(this.storagePaths.itemStorePath, backupStore);
+      return backupStore;
+    }
   }
 
   async saveItems(items: TimelineItemEntity[]): Promise<void> {
-    this.persist({
+    console.log('JsonStore.saveItems: 保存', items.length, '条记录');
+    if (items.length > 0) {
+      console.log('第一条记录内容:', items[0].content);
+    }
+    const storeData: TimelineStoreData = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       updatedAt: Date.now(),
       items
-    });
+    };
+    this.persistStore(storeData);
+    console.log('JsonStore.saveItems: 保存完成');
   }
 
-  private persist(data: TimelineStoreData): void {
-    this.fileStorage.writeText(this.storagePaths.itemStorePath, JSON.stringify(data, null, 2));
+  private createEmptyStoreData(): TimelineStoreData {
+    return {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      updatedAt: Date.now(),
+      items: []
+    };
+  }
+
+  private loadFromPath(path: string, label: string): TimelineStoreData {
+    const raw = this.fileStorage.readText(path).trim();
+    if (raw.length === 0) {
+      throw new Error(`${label}为空文件: ${path}`);
+    }
+
+    const parsed = JSON.parse(raw) as TimelineStoreData;
+    const normalized = {
+      schemaVersion: parsed.schemaVersion ?? CURRENT_SCHEMA_VERSION,
+      updatedAt: parsed.updatedAt ?? Date.now(),
+      items: Array.isArray(parsed.items) ? parsed.items : []
+    } as TimelineStoreData;
+
+    console.log(`JsonStore.load: ${label}加载到`, normalized.items.length, '条记录');
+    if (normalized.items.length > 0) {
+      console.log(`JsonStore.load: ${label}第一条记录内容:`, normalized.items[0].content);
+    }
+
+    return normalized;
+  }
+
+  private persistStore(data: TimelineStoreData): void {
+    this.persistToPath(this.storagePaths.itemStorePath, data);
+    this.persistToPath(this.storagePaths.itemStoreBackupPath, data);
+  }
+
+  private persistToPath(path: string, data: TimelineStoreData): void {
+    this.fileStorage.writeText(path, JSON.stringify(data, null, 2));
   }
 }

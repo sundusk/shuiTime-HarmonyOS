@@ -33,4 +33,8 @@ export class StoragePaths {
   get itemStorePath(): string {
     return `${this.dataRootDir}/${ITEM_STORE_FILE_NAME}`;
   }
+
+  get itemStoreBackupPath(): string {
+    return `${this.dataRootDir}/${ITEM_STORE_FILE_NAME}.bak`;
+  }
 }

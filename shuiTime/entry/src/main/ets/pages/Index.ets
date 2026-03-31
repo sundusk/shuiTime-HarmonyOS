@@ -156,6 +156,8 @@ struct Index {
     .width('100%')
     .height('100%')
     .zIndex(150)
+    // 只让悬浮按钮本身参与命中，避免整层透明容器挡住底部自定义 tab。
+    .hitTestBehavior(HitTestMode.Transparent)
   }
 
   @Builder
