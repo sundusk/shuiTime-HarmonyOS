@@ -1,11 +1,18 @@
 import { getTimelineRepository, initializeAppBootstrap } from '../../app/AppBootstrap';
 import { getDayRange } from '../../common/utils/DateUtils';
+import { generateId } from '../../common/utils/IdUtils';
 import { TimelineItemEntity } from '../../data/model/TimelineItemEntity';
 
 @Component
 export struct TimelinePlaceholderPage {
+  private readonly composerInputId: string = 'timeline-composer-input';
+
   @State private dayItems: TimelineItemEntity[] = [];
   @State private isLoading: boolean = true;
+  @State private isComposerVisible: boolean = false;
+  @State private draftContent: string = '';
+  @State private isSaving: boolean = false;
+  @State private composerFocused: boolean = false;
 
   aboutToAppear(): void {
     this.loadTodayItems();
@@ -40,12 +47,7 @@ export struct TimelinePlaceholderPage {
           this.buildTimelineList();
         }
 
-        Row() {
-          Blank();
-          this.buildFloatingActionButton();
-        }
-        .width('100%')
-        .padding({ left: 24, right: 24, bottom: 20 });
+        this.buildBottomBar();
       }
       .width('100%')
       .height('100%')
@@ -262,17 +264,89 @@ export struct TimelinePlaceholderPage {
   }
 
   @Builder
-  private buildFloatingActionButton() {
-    Stack() {
-      Image($r('app.media.xiaoshui_core'))
-        .width(68)
-        .height(68)
-        .objectFit(ImageFit.Cover)
-        .clip(true);
+  private buildBottomBar() {
+    Row() {
+      if (this.isComposerVisible) {
+        this.buildComposerBar();
+      } else {
+        Blank();
+        // 悬浮球已移到全局，这里不再显示
+      }
     }
-    .width(68)
-    .height(68)
-    .clip(true);
+    .width('100%')
+    .padding({ left: 16, right: 16, bottom: 20 })
+    .zIndex(100);
+  }
+
+  @Builder
+  private buildComposerBar() {
+    Row({ space: 10 }) {
+      this.buildComposerSideButton('想');
+      this.buildComposerSideButton('图');
+
+      TextInput({ placeholder: '记录此刻...', text: this.draftContent })
+        .id(this.composerInputId)
+        .type(InputType.Normal)
+        .enterKeyType(EnterKeyType.Send)
+        .focusable(true)
+        .defaultFocus(this.composerFocused)
+        .fontSize(16)
+        .fontColor('#2A3040')
+        .placeholderColor('#A0A6B4')
+        .caretColor('#4A7DFF')
+        .backgroundColor('#EEF1F7')
+        .borderRadius(18)
+        .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+        .layoutWeight(1)
+        .onChange((value: string) => {
+          this.draftContent = value;
+        })
+        .onSubmit((_enterKey: EnterKeyType) => {
+          this.submitComposer();
+        });
+
+      this.buildComposerActionButton(this.canSubmitComposer() ? '发' : '收');
+    }
+    .width('100%')
+    .padding({ left: 12, right: 10, top: 10, bottom: 10 })
+    .backgroundColor('#FFFFFFF2')
+    .borderRadius(24)
+    .zIndex(100);
+  }
+
+  @Builder
+  private buildComposerSideButton(label: string) {
+    Stack() {
+      Text(label)
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#8C93A1');
+    }
+    .width(24)
+    .height(24)
+    .borderRadius(12)
+    .backgroundColor('#F4F6FA');
+  }
+
+  @Builder
+  private buildComposerActionButton(label: string) {
+    Stack() {
+      Text(label)
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.canSubmitComposer() ? '#4A7DFF' : '#8F97A6');
+    }
+    .width(28)
+    .height(28)
+    .borderRadius(14)
+    .backgroundColor(this.canSubmitComposer() ? '#EAF1FF' : '#F3F5F8')
+    .onClick(() => {
+      if (this.canSubmitComposer()) {
+        this.submitComposer();
+        return;
+      }
+      this.closeComposer();
+    });
   }
 
   private async loadTodayItems(): Promise<void> {
@@ -304,5 +378,44 @@ export struct TimelinePlaceholderPage {
     const hour = `${date.getHours()}`.padStart(2, '0');
     const minute = `${date.getMinutes()}`.padStart(2, '0');
     return `${hour}:${minute}`;
+  }
+
+  public openComposer(): void {
+    console.log('打开输入框，设置可见性为 true');
+    this.isComposerVisible = true;
+    this.composerFocused = true;
+  }
+
+  private closeComposer(): void {
+    this.isComposerVisible = false;
+    this.draftContent = '';
+    this.composerFocused = false;
+  }
+
+  private canSubmitComposer(): boolean {
+    return !this.isSaving && this.draftContent.trim().length > 0;
+  }
+
+  private async submitComposer(): Promise<void> {
+    const content = this.draftContent.trim();
+    if (this.isSaving || content.length === 0) {
+      return;
+    }
+
+    this.isSaving = true;
+    try {
+      const createdItem = await getTimelineRepository().create({
+        id: generateId(),
+        timestamp: Date.now(),
+        content,
+        iconName: '',
+        type: 'timeline',
+        isLivePhoto: false
+      });
+      this.dayItems = [createdItem, ...this.dayItems];
+      this.closeComposer();
+    } finally {
+      this.isSaving = false;
+    }
   }
 }
