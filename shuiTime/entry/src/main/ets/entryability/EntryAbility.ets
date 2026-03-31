@@ -21,6 +21,7 @@ export default class EntryAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
+    this.configureSystemBars(windowStage);
 
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
@@ -44,5 +45,24 @@ export default class EntryAbility extends UIAbility {
   onBackground(): void {
     // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+  }
+
+  private configureSystemBars(windowStage: window.WindowStage): void {
+    try {
+      const mainWindow = windowStage.getMainWindowSync();
+      const systemBarProperties: window.SystemBarProperties = {
+        statusBarColor: '#F8FAFD',
+        navigationBarColor: '#F8FAFD',
+        statusBarContentColor: '#1F2430',
+        navigationBarContentColor: '#1F2430'
+      };
+
+      mainWindow.setWindowSystemBarProperties(systemBarProperties)
+        .catch((err: Error) => {
+          hilog.error(DOMAIN, 'testTag', 'Failed to set system bar properties. Cause: %{public}s', JSON.stringify(err));
+        });
+    } catch (err) {
+      hilog.error(DOMAIN, 'testTag', 'Failed to access main window. Cause: %{public}s', JSON.stringify(err));
+    }
   }
 }
