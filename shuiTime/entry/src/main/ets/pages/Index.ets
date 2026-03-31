@@ -1,8 +1,11 @@
-import { initializeAppBootstrap } from '../app/AppBootstrap';
+import { getTimelineRepository, initializeAppBootstrap } from '../app/AppBootstrap';
+import { generateId } from '../common/utils/IdUtils';
+import { TimelineItemEntity } from '../data/model/TimelineItemEntity';
 import { InspirationPlaceholderPage } from '../features/inspiration/InspirationPlaceholderPage';
 import { LookbackPlaceholderPage } from '../features/lookback/LookbackPlaceholderPage';
 import { TimelinePlaceholderPage } from '../features/timeline/TimelinePlaceholderPage';
 import { window } from '@kit.ArkUI'; // 导入 window 模块
+import router from '@ohos.router';
 
 @Entry
 @Component
@@ -11,6 +14,9 @@ struct Index {
   @State private showComposer: boolean = false;
   @State private draftContent: string = '';
   @State private isKeyboardVisible: boolean = false; // 键盘可见状态
+  @State private isSubmittingComposer: boolean = false;
+  @State private timelineItems: TimelineItemEntity[] = [];
+  @State private isTimelineLoading: boolean = true;
   private tabsController: TabsController = new TabsController();
   private readonly tabTitles: string[] = ['时间线', '瞬息', '回顾'];
   private readonly composerInputKey: string = 'global-composer-input';
@@ -31,7 +37,21 @@ struct Index {
         controller: this.tabsController
       }) {
         TabContent() {
-          TimelinePlaceholderPage()
+          Column() {
+            TimelinePlaceholderPage({
+              items: $timelineItems,
+              isLoading: this.isTimelineLoading
+            })
+          }
+          .width('100%')
+          .height('100%')
+          .onAppear(() => {
+            console.log('时间线页面显示，当前索引:', this.currentIndex, '数据长度:', this.timelineItems.length);
+            // 每次显示时间线页面时刷新数据
+            if (this.currentIndex === 0) {
+              this.loadTimelineItems();
+            }
+          })
         }
         .tabBar(this.renderTabBar('时间线', 0))
 
@@ -56,6 +76,9 @@ struct Index {
         if (this.showComposer && index !== 0) {
           this.closeGlobalComposer();
         }
+        if (index === 0) {
+          this.loadTimelineItems();
+        }
       })
 
       Column() {
@@ -68,16 +91,31 @@ struct Index {
       .height('100%')
 
       // 全局悬浮球
-      this.buildGlobalFloatingActionButton();
+      if (!(this.showComposer && this.currentIndex === 0)) {
+        this.buildGlobalFloatingActionButton();
+      }
 
       // 全局输入框（当在时间线页面时显示）
       if (this.showComposer && this.currentIndex === 0) {
+        this.buildComposerBackdrop();
         this.buildGlobalComposer();
       }
     }
     .width('100%')
     .height('100%')
     .backgroundColor('#F8FAFD')
+  }
+
+  @Builder
+  private buildComposerBackdrop() {
+    Column() {}
+      .width('100%')
+      .height('100%')
+      .backgroundColor('#140C1B2A')
+      .zIndex(170)
+      .onClick(() => {
+        this.closeGlobalComposer();
+      });
   }
 
   @Builder
@@ -106,7 +144,9 @@ struct Index {
         .onClick(() => {
           console.log('全局悬浮球被点击了');
           if (this.currentIndex === 0) {
-            this.openGlobalComposer();
+            router.pushUrl({
+              url: 'pages/TimelineComposePage'
+            });
           }
         });
       }
@@ -124,54 +164,87 @@ struct Index {
       Blank()
         .layoutWeight(1);
 
-      Row({ space: 0 }) {
-        this.buildComposerSideButton('想');
-        this.buildComposerSideButton('图');
+      Column() {
+        Row({ space: 10 }) {
+          Row({ space: 8 }) {
+            this.buildComposerSideButton('想');
+            this.buildComposerSideButton('图');
+          }
+          .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+          .backgroundColor('#F6F8FC')
+          .borderRadius(0);
 
-        TextInput({ placeholder: '记录此刻...', text: this.draftContent })
-          .key(this.composerInputKey)
-          .type(InputType.Normal)
-          .enterKeyType(EnterKeyType.Send)
-          .focusable(true)
-          .defaultFocus(true)
-          .fontSize(16)
-          .fontColor('#2A3040')
-          .placeholderColor('#A0A6B4')
-          .caretColor('#4A7DFF')
-          .backgroundColor('#EEF1F7')
-          .borderRadius(0)
-          .padding({ left: 14, right: 14, top: 16, bottom: 16 })
+          Row({ space: 8 }) {
+            Stack() {
+              Circle()
+                .width(8)
+                .height(8)
+                .fill('#6FA6FF');
+            }
+            .width(22)
+            .height(22)
+            .borderRadius(11)
+            .backgroundColor('#E8F1FF');
+
+            TextInput({ placeholder: '记录此刻...', text: this.draftContent })
+              .key(this.composerInputKey)
+              .type(InputType.Normal)
+              .enterKeyType(EnterKeyType.Send)
+              .focusable(true)
+              .defaultFocus(true)
+              .fontSize(16)
+              .fontColor('#2A3040')
+              .placeholderColor('#A0A6B4')
+              .caretColor('#4A7DFF')
+              .backgroundColor('#00FFFFFF')
+              .padding({ left: 0, right: 0, top: 8, bottom: 8 })
+              .layoutWeight(1)
+              .onChange((value: string) => {
+                this.draftContent = value;
+              })
+              .onSubmit((_enterKey: EnterKeyType) => {
+                this.submitGlobalComposer();
+              })
+              .onAppear(() => {
+                setTimeout(() => {
+                  console.log('输入框出现，请求焦点');
+                  try {
+                    this.getUIContext().getFocusController().requestFocus(this.composerInputKey);
+                  } catch (error) {
+                    console.error('请求焦点失败:', error);
+                  }
+                }, 100);
+              })
+              .onBlur(() => {
+                console.log('输入框失去焦点');
+              });
+          }
           .layoutWeight(1)
-          .onChange((value: string) => {
-            this.draftContent = value;
-          })
-          .onSubmit((_enterKey: EnterKeyType) => {
-            this.submitGlobalComposer();
-          })
-          .onAppear(() => {
-            // 输入框出现后立即请求焦点
-            setTimeout(() => {
-              console.log('输入框出现，请求焦点');
-              try {
-                this.getUIContext().getFocusController().requestFocus(this.composerInputKey);
-              } catch (error) {
-                console.error('请求焦点失败:', error);
-              }
-            }, 100);
-          })
-          .onBlur(() => {
-            // 输入框失去焦点时触发
-            console.log('输入框失去焦点');
-            // 这里可以添加额外的逻辑，但主要依赖键盘高度监听
-          });
+          .padding({ left: 12, right: 6, top: 4, bottom: 4 })
+          .backgroundColor('#F4F7FC')
+          .borderRadius(0);
 
-        this.buildComposerActionButton(this.canSubmitComposer() ? '发' : '收');
+          this.buildComposerActionButton(this.canSubmitComposer() ? '发' : '收');
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center);
       }
       .width('100%')
-      .padding({ left: 0, right: 0, top: 0, bottom: 0 })
-      .backgroundColor('#FFFFFF')
+      .margin({ left: 14, right: 14, bottom: 20 })
+      .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+      .backgroundColor('#FFFFFFFA')
+      .border({
+        width: 1,
+        color: '#E8EEF7',
+        radius: 0
+      })
       .borderRadius(0)
-      .margin({ bottom: 0 });
+      .shadow({
+        radius: 24,
+        color: '#1F102030',
+        offsetX: 0,
+        offsetY: 12
+      });
     }
     .width('100%')
     .height('100%')
@@ -182,14 +255,19 @@ struct Index {
   private buildComposerSideButton(label: string) {
     Stack() {
       Text(label)
-        .fontSize(14)
+        .fontSize(13)
         .fontWeight(FontWeight.Medium)
-        .fontColor('#8C93A1');
+        .fontColor(label === '想' ? '#4A7DFF' : '#8C93A1');
     }
-    .width(24)
-    .height(24)
-    .borderRadius(12)
-    .backgroundColor('#F4F6FA');
+    .width(34)
+    .height(30)
+    .borderRadius(0)
+    .backgroundColor(label === '想' ? '#EAF2FF' : '#FFFFFF')
+    .border({
+      width: 1,
+      color: label === '想' ? '#D6E6FF' : '#ECEFF4',
+      radius: 0
+    });
   }
 
   @Builder
@@ -198,12 +276,18 @@ struct Index {
       Text(label)
         .fontSize(15)
         .fontWeight(FontWeight.Medium)
-        .fontColor(this.canSubmitComposer() ? '#4A7DFF' : '#8F97A6');
+        .fontColor(this.canSubmitComposer() ? '#FFFFFF' : '#7E8795');
     }
-    .width(28)
-    .height(28)
-    .borderRadius(14)
-    .backgroundColor(this.canSubmitComposer() ? '#EAF1FF' : '#F3F5F8')
+    .width(44)
+    .height(36)
+    .borderRadius(0)
+    .backgroundColor(this.canSubmitComposer() ? '#4A7DFF' : '#EEF2F7')
+    .shadow({
+      radius: this.canSubmitComposer() ? 16 : 8,
+      color: this.canSubmitComposer() ? '#294A7DFF' : '#11000000',
+      offsetX: 0,
+      offsetY: this.canSubmitComposer() ? 8 : 4
+    })
     .onClick(() => {
       if (this.canSubmitComposer()) {
         this.submitGlobalComposer();
@@ -348,19 +432,19 @@ struct Index {
   }
 
   private setupKeyboardListener(): void {
-    console.log('设置键盘监听器');
-    window.getLastWindow(this.getUIContext().getHostContext()).then((currentWindow) => {
+    const context = this.getUIContext().getHostContext();
+    if (!context) {
+      console.error('无法获取应用上下文');
+      return;
+    }
+    window.getLastWindow(context).then((currentWindow) => {
       currentWindow.on('keyboardHeightChange', (keyboardHeight: number) => {
-        console.log('键盘高度变化:', keyboardHeight);
-        
         if (keyboardHeight === 0) {
-          // 键盘收起
-          console.log('键盘收起，关闭输入框');
           this.isKeyboardVisible = false;
-          this.closeGlobalComposer();
+          if (!this.isSubmittingComposer && this.draftContent.trim().length === 0) {
+            this.closeGlobalComposer();
+          }
         } else {
-          // 键盘弹出
-          console.log('键盘弹出');
           this.isKeyboardVisible = true;
         }
       });
@@ -371,7 +455,11 @@ struct Index {
 
   private cleanupKeyboardListener(): void {
     console.log('清理键盘监听器');
-    window.getLastWindow(this.getUIContext().getHostContext()).then((currentWindow) => {
+    const context = this.getUIContext().getHostContext();
+    if (!context) {
+      return;
+    }
+    window.getLastWindow(context).then((currentWindow) => {
       currentWindow.off('keyboardHeightChange');
     }).catch((error: Error) => {
       console.error('清理键盘监听器失败:', error);
@@ -379,35 +467,117 @@ struct Index {
   }
 
   private openGlobalComposer(): void {
-    console.log('打开全局输入框');
     this.showComposer = true;
   }
 
   private closeGlobalComposer(): void {
-    console.log('关闭全局输入框');
     this.showComposer = false;
     this.draftContent = '';
   }
 
   private canSubmitComposer(): boolean {
-    return this.draftContent.trim().length > 0;
+    return !this.isSubmittingComposer && this.draftContent.trim().length > 0;
   }
 
   private async submitGlobalComposer(): Promise<void> {
     const content = this.draftContent.trim();
-    if (content.length === 0) {
+    if (this.isSubmittingComposer || content.length === 0) {
       return;
     }
 
-    console.log('提交内容:', content);
-    // 这里可以添加保存内容的逻辑
-    this.closeGlobalComposer();
+    this.isSubmittingComposer = true;
+    this.draftContent = '';
+
+    try {
+      console.log('开始提交内容:', content);
+      const context = this.getUIContext().getHostContext();
+      if (!context) {
+        throw new Error('无法获取应用上下文');
+      }
+      console.log('应用上下文获取成功');
+      await initializeAppBootstrap(context.filesDir);
+      console.log('AppBootstrap初始化完成');
+      
+      const createdItem: TimelineItemEntity = {
+        id: generateId(),
+        timestamp: Date.now(),
+        content,
+        iconName: '',
+        type: 'timeline',
+        isLivePhoto: false
+      };
+      console.log('创建时间线项:', createdItem);
+      
+      const savedItem = await getTimelineRepository().create(createdItem);
+      console.log('数据保存成功，保存的项:', savedItem);
+      
+      // 重新加载所有数据确保一致性
+      console.log('重新加载数据...');
+      await this.loadTimelineItems(false);
+      console.log('数据重新加载完成');
+      
+      this.closeGlobalComposer();
+      console.log('输入框已关闭');
+    } catch (error) {
+      this.draftContent = content;
+      console.error('提交内容失败:', error);
+      return;
+    } finally {
+      this.isSubmittingComposer = false;
+    }
   }
+
+  private async loadTimelineItems(showLoading: boolean = true): Promise<void> {
+    console.log('开始加载时间线数据，showLoading:', showLoading);
+    if (showLoading) {
+      this.isTimelineLoading = true;
+    }
+    try {
+      const context = this.getUIContext().getHostContext();
+      if (!context) {
+        throw new Error('无法获取应用上下文');
+      }
+      console.log('应用上下文获取成功，filesDir:', context.filesDir);
+      await initializeAppBootstrap(context.filesDir);
+      console.log('AppBootstrap初始化完成');
+      const loadedItems = await getTimelineRepository().listAll();
+      console.log('从数据库加载到', loadedItems.length, '条记录');
+      
+      if (loadedItems.length > 0) {
+        console.log('第一条记录详情:', {
+          id: loadedItems[0].id,
+          content: loadedItems[0].content,
+          timestamp: loadedItems[0].timestamp,
+          type: loadedItems[0].type
+        });
+      }
+      
+      // 强制创建新数组引用，确保触发UI更新
+      this.timelineItems = [...loadedItems];
+      console.log('时间线数据已更新，记录数:', this.timelineItems.length);
+    } catch (error) {
+      console.error('加载时间线失败:', error);
+      if (showLoading) {
+        this.timelineItems = [];
+      }
+    } finally {
+      if (showLoading) {
+        this.isTimelineLoading = false;
+      }
+      console.log('时间线数据加载完成');
+    }
+  }
+
+
 
   private async initializeDataFoundation(): Promise<void> {
     try {
-      const currentContext = getContext(this);
-      await initializeAppBootstrap(currentContext.filesDir);
+      const context = this.getUIContext().getHostContext();
+      if (!context) {
+        throw new Error('无法获取应用上下文');
+      }
+      await initializeAppBootstrap(context.filesDir);
+      await this.loadTimelineItems();
     } catch (_) {
     }
   }
