@@ -246,7 +246,7 @@ export struct TimelinePlaceholderPage {
     }
     .width('100%')
     .layoutWeight(1)
-    .padding({ left: 20, right: 20, top: 24, bottom: 24 })
+    .padding({ left: 20, right: 20, top: 24, bottom: 88 })
     .scrollBar(BarState.Off);
   }
 

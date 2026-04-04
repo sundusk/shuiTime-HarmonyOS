@@ -18,7 +18,7 @@ export struct LookbackPlaceholderPage {
       }
       .width('100%')
       .alignItems(HorizontalAlign.Start)
-      .padding(24)
+      .padding({ left: 24, right: 24, top: 24, bottom: 88 })
     }
     .width('100%')
     .height('100%')

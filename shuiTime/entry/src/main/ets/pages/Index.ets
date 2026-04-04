@@ -18,7 +18,6 @@ struct Index {
   @State private timelineItems: TimelineItemEntity[] = [];
   @State private isTimelineLoading: boolean = true;
   private tabsController: TabsController = new TabsController();
-  private readonly tabTitles: string[] = ['时间线', '瞬息', '回顾'];
   private readonly composerInputKey: string = 'global-composer-input';
 
   aboutToAppear(): void {
@@ -53,17 +52,17 @@ struct Index {
             }
           })
         }
-        .tabBar(this.renderTabBar('时间线', 0))
+        .tabBar('')
 
         TabContent() {
           InspirationPlaceholderPage()
         }
-        .tabBar(this.renderTabBar('瞬息', 1))
+        .tabBar('')
 
         TabContent() {
           LookbackPlaceholderPage()
         }
-        .tabBar(this.renderTabBar('回顾', 2))
+        .tabBar('')
       }
       .vertical(false)
       .scrollable(false)
@@ -81,6 +80,7 @@ struct Index {
         }
       })
 
+      // 自定义浮动 TabBar
       Column() {
         Blank()
           .layoutWeight(1);
@@ -89,6 +89,7 @@ struct Index {
       }
       .width('100%')
       .height('100%')
+      .hitTestBehavior(HitTestMode.Transparent)
 
       // 全局悬浮球
       if (!(this.showComposer && this.currentIndex === 0)) {
@@ -300,137 +301,53 @@ struct Index {
   }
 
   @Builder
-  private renderTabBar(title: string, index: number) {
-    Column({ space: 4 }) {
-      this.buildTabIcon(index);
-
-      Text(title)
-        .fontSize(13)
-        .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
-        .fontColor(this.currentIndex === index ? '#4A90E2' : '#1F2430')
-    }
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-    .width('76%')
-    .height(52)
-    .backgroundColor(this.currentIndex === index ? '#EEF4FF' : '#F8FAFD')
-    .borderRadius(26)
-    .padding({ top: 6, bottom: 6 })
-  }
-
-  @Builder
   private buildFloatingTabBar() {
     Row() {
-      ForEach(this.tabTitles, (title: string, index: number) => {
-        this.buildFloatingTabItem(title, index);
-      }, (title: string) => title)
+      this.buildFloatingTabItem('时间线', 0, $r('app.media.ic_tab_timeline'));
+      this.buildFloatingTabItem('瞬息', 1, $r('app.media.ic_tab_inspiration'));
+      this.buildFloatingTabItem('回顾', 2, $r('app.media.ic_tab_lookback'));
     }
-    .width('68%')
-    .justifyContent(FlexAlign.SpaceAround)
+    .width('92%')
+    .height(64)
+    .justifyContent(FlexAlign.SpaceEvenly)
     .alignItems(VerticalAlign.Center)
-    .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-    .margin({ bottom: 16 })
-    .backgroundColor('#FFFFFFF7')
-    .borderRadius(24)
+    .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+    .margin({ bottom: 12 })
+    .backgroundColor('#FFFFFF')
+    .borderRadius(32)
     .shadow({
-      radius: 20,
-      color: '#14000000',
+      radius: 24,
+      color: '#18000000',
       offsetX: 0,
       offsetY: 8
     })
   }
 
   @Builder
-  private buildFloatingTabItem(title: string, index: number) {
-    Column({ space: 6 }) {
-      this.buildTabIcon(index);
+  private buildFloatingTabItem(title: string, index: number, icon: Resource) {
+    Column({ space: 2 }) {
+      Image(icon)
+        .width(24)
+        .height(24)
+        .fillColor(this.currentIndex === index ? '#007DFF' : '#99000000')
 
       Text(title)
         .fontSize(10)
         .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Normal)
-        .fontColor(this.currentIndex === index ? '#3F7DFF' : '#1F2430');
+        .fontColor(this.currentIndex === index ? '#007DFF' : '#99000000');
     }
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
-    .width('31%')
-    .height(36)
-    .backgroundColor(this.currentIndex === index ? '#ECEDEF' : '#00FFFFFF')
-    .borderRadius(18)
+    .width(60)
+    .height(52)
+    .backgroundColor(this.currentIndex === index ? '#1A007DFF' : '#00FFFFFF')
+    .borderRadius(16)
     .onClick(() => {
-      if (this.currentIndex === index) {
-        return;
+      if (this.currentIndex !== index) {
+        this.currentIndex = index;
+        this.tabsController.changeIndex(index);
       }
-      this.currentIndex = index;
-      this.tabsController.changeIndex(index);
     })
-  }
-
-  @Builder
-  private buildTabIcon(index: number) {
-    Stack() {
-      if (index === 0) {
-        // 时间线图标 - 列表样式
-        Column({ space: 3 }) {
-          Row() {}
-            .width(16)
-            .height(2.5)
-            .borderRadius(1.5)
-            .backgroundColor(this.currentIndex === index ? '#3F7DFF' : '#1F2430');
-          Row() {}
-            .width(16)
-            .height(2.5)
-            .borderRadius(1.5)
-            .backgroundColor(this.currentIndex === index ? '#3F7DFF' : '#1F2430');
-          Row() {}
-            .width(16)
-            .height(2.5)
-            .borderRadius(1.5)
-            .backgroundColor(this.currentIndex === index ? '#3F7DFF' : '#1F2430');
-        }
-      } else if (index === 1) {
-        // 瞬息图标 - 应用/卡片样式
-        Column({ space: 2 }) {
-          Circle()
-            .width(4)
-            .height(4)
-            .fill(this.currentIndex === index ? '#3F7DFF' : '#1F2430')
-            .margin({ left: 7 });
-
-          Row() {}
-            .width(16)
-            .height(12)
-            .border({
-              width: 2,
-              color: this.currentIndex === index ? '#3F7DFF' : '#1F2430',
-              radius: 3
-            })
-            .backgroundColor('#00FFFFFF')
-        }
-      } else {
-        // 回顾图标 - 时钟样式
-        Stack() {
-          Circle()
-            .width(14)
-            .height(14)
-            .stroke(this.currentIndex === index ? '#3F7DFF' : '#1F2430')
-            .strokeWidth(2);
-          Row() {}
-            .width(1.5)
-            .height(5)
-            .backgroundColor(this.currentIndex === index ? '#3F7DFF' : '#1F2430')
-            .margin({ top: 2 });
-          Row() {}
-            .width(4)
-            .height(1.5)
-            .backgroundColor(this.currentIndex === index ? '#3F7DFF' : '#1F2430')
-            .margin({ left: 2 });
-        }
-        .width(16)
-        .height(16)
-      }
-    }
-    .width(20)
-    .height(20)
   }
 
   private setupKeyboardListener(): void {
