@@ -1,5 +1,9 @@
 import router from '@ohos.router';
 import { window } from '@kit.ArkUI';
+// AppStorage是全局可用的，无需导入
+import { getTimelineRepository, initializeAppBootstrap } from '../app/AppBootstrap';
+import { generateId } from '../common/utils/IdUtils';
+import { TimelineItemEntity } from '../data/model/TimelineItemEntity';
 
 interface KeyboardAvoidAreaChangeInfo {
   type: window.AvoidAreaType;
@@ -11,6 +15,7 @@ interface KeyboardAvoidAreaChangeInfo {
 struct TimelineComposePage {
   @State private content: string = '';
   @State private keyboardInset: number = 0;
+  @State private isSubmitting: boolean = false;
   private readonly editorInputKey: string = 'timeline-compose-editor';
   private readonly toolbarHeightEstimate: number = 58;
   private readonly keyboardToolbarGapCompensation: number = 30;
@@ -139,7 +144,7 @@ struct TimelineComposePage {
 
         Blank();
 
-        this.buildVoiceButton();
+        this.buildSendButton();
       }
       .width('100%')
       .padding({ left: 18, right: 12, top: 12, bottom: 6 })
@@ -206,41 +211,34 @@ struct TimelineComposePage {
   }
 
   @Builder
-  private buildVoiceButton() {
-    Row({ space: 4 }) {
-      this.buildVoiceWave(10);
-      this.buildVoiceWave(14);
-      this.buildVoiceWave(10);
-    }
-    .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-    .backgroundColor('#DDF8E9')
-    .borderRadius(22);
-  }
-
-  @Builder
-  private buildVoiceWave(height: number) {
-    Row() {}
-      .width(2)
-      .height(height)
-      .borderRadius(2)
-      .backgroundColor('#42C983');
+  private buildSendButton() {
+    Text(this.isSubmitting ? '发送中' : '发送')
+      .fontSize(15)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(this.canSend() ? '#FFFFFF' : '#8FA0B3')
+      .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+      .backgroundColor(this.canSend() ? '#4A7DFF' : '#E7EDF5')
+      .borderRadius(22)
+      .opacity(this.isSubmitting ? 0.82 : 1)
+      .onClick(() => {
+        this.submitTimelineItem();
+      });
   }
 
   private requestEditorFocus(): void {
     const focus = (): void => {
       try {
-        const focused = focusControl.requestFocus(this.editorInputKey);
-        if (!focused) {
-          this.getUIContext().getFocusController().requestFocus(this.editorInputKey);
-        }
+        // 使用正确的焦点控制器API，从API version 12开始生效
+        const focusController = this.getUIContext().getFocusController();
+        focusController.requestFocus(this.editorInputKey);
       } catch (error) {
         console.error('编辑页请求焦点失败:', error);
       }
     };
 
-    setTimeout(focus, 80);
-    setTimeout(focus, 240);
-    setTimeout(focus, 420);
+    // 使用更合理的延迟策略
+    setTimeout(focus, 100);
+    setTimeout(focus, 300);
   }
 
   private getEditorBottomPadding(): number {
@@ -257,6 +255,52 @@ struct TimelineComposePage {
 
   private shouldShowToolbar(): boolean {
     return this.keyboardInset > 0;
+  }
+
+  private canSend(): boolean {
+    return !this.isSubmitting && this.content.trim().length > 0;
+  }
+
+  private async submitTimelineItem(): Promise<void> {
+    const trimmedContent = this.content.trim();
+    if (!this.canSend() || trimmedContent.length === 0) {
+      return;
+    }
+
+    this.isSubmitting = true;
+
+    try {
+      const context = this.getUIContext().getHostContext();
+      if (!context) {
+        throw new Error('编辑页无法获取应用上下文');
+      }
+
+      console.log('开始初始化AppBootstrap...');
+      await initializeAppBootstrap(context.filesDir);
+      console.log('AppBootstrap初始化完成');
+      
+      const createdItem: TimelineItemEntity = {
+        id: generateId(),
+        timestamp: Date.now(),
+        content: trimmedContent,
+        iconName: '',
+        type: 'timeline',
+        isLivePhoto: false
+      };
+
+      console.log('开始保存时间线项:', createdItem);
+      await getTimelineRepository().create(createdItem);
+      AppStorage.SetOrCreate<number>('timeline_refresh_token', Date.now());
+
+      console.log('强制重建Index页面以刷新时间线');
+      await router.replaceUrl({
+        url: 'pages/Index'
+      } as router.RouterOptions);
+    } catch (error) {
+      console.error('发送时间线内容失败:', error);
+    } finally {
+      this.isSubmitting = false;
+    }
   }
 
   private bindWindowAndKeyboard(): void {

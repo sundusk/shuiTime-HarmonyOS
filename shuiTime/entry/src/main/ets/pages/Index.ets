@@ -10,6 +10,8 @@ import router from '@ohos.router';
 @Entry
 @Component
 struct Index {
+  @StorageProp('timeline_refresh_token') @Watch('onTimelineRefreshTokenChange')
+  private timelineRefreshToken: number = 0;
   @State private currentIndex: number = 0;
   @State private showComposer: boolean = false;
   @State private draftContent: string = '';
@@ -17,12 +19,36 @@ struct Index {
   @State private isSubmittingComposer: boolean = false;
   @State private timelineItems: TimelineItemEntity[] = [];
   @State private isTimelineLoading: boolean = true;
+  @State private lastHandledTimelineRefreshToken: number = 0;
   private tabsController: TabsController = new TabsController();
   private readonly composerInputKey: string = 'global-composer-input';
 
   aboutToAppear(): void {
+    AppStorage.SetOrCreate<number>('timeline_refresh_token', 0);
+    this.lastHandledTimelineRefreshToken = AppStorage.Get<number>('timeline_refresh_token') ?? 0;
     this.initializeDataFoundation();
     this.setupKeyboardListener(); // 设置键盘监听
+    this.loadTimelineItems(false);
+  }
+
+  onPageShow(): void {
+    this.tryRefreshTimelineFromToken();
+  }
+
+  private onTimelineRefreshTokenChange(): void {
+    this.tryRefreshTimelineFromToken();
+  }
+
+  private tryRefreshTimelineFromToken(): void {
+    const latestToken = AppStorage.Get<number>('timeline_refresh_token') ?? 0;
+    if (latestToken === this.lastHandledTimelineRefreshToken) {
+      return;
+    }
+
+    this.lastHandledTimelineRefreshToken = latestToken;
+    if (this.currentIndex === 0) {
+      this.loadTimelineItems(false);
+    }
   }
 
   aboutToDisappear(): void {
@@ -147,7 +173,7 @@ struct Index {
           if (this.currentIndex === 0) {
             router.pushUrl({
               url: 'pages/TimelineComposePage'
-            });
+            } as router.RouterOptions);
           }
         });
       }
