@@ -236,7 +236,7 @@ export struct TimelinePlaceholderPage {
 
   @Builder
   private buildTimelineList(items: TimelineItemEntity[]) {
-    List({ space: 20 }) {
+    List({ space: 0 }) {
       ForEach(items, (item: TimelineItemEntity, index: number) => {
         ListItem() {
           this.buildTimelineListItem(items, item, index);
@@ -249,7 +249,6 @@ export struct TimelinePlaceholderPage {
     .padding({ left: 20, right: 20, top: 24, bottom: 88 })
     .scrollBar(BarState.Off);
   }
-
   @Builder
   private buildTimelineListItem(items: TimelineItemEntity[], item: TimelineItemEntity, index: number) {
     Column({ space: 12 }) {
@@ -261,26 +260,28 @@ export struct TimelinePlaceholderPage {
           .width('100%');
       }
 
-      this.buildTimelineCard(item, this.isLastItemOfDay(items, index));
+      this.buildTimelineCard(item, this.shouldShowDayHeader(items, index), this.isLastItemOfDay(items, index))
     }
     .width('100%');
   }
 
   @Builder
-  private buildTimelineCard(item: TimelineItemEntity, isLast: boolean) {
+  private buildTimelineCard(item: TimelineItemEntity, isFirstOfDay: boolean, isLast: boolean) {
     Row({ space: 12 }) {
       Column() {
-        Row() {}
-          .width(2)
-          .height(14)
-          .backgroundColor('#C9DAFF');
+        if (isFirstOfDay) {
+          Row() {}
+            .width(2)
+            .height(14)
+            .backgroundColor('#C9DAFF');
+        }
 
         this.buildTimelineNode(item.type);
 
         if (!isLast) {
           Row() {}
             .width(2)
-            .height(54)
+            .height(74)
             .backgroundColor('#C9DAFF');
         } else {
           Blank()
