@@ -303,9 +303,24 @@ struct Index {
   @Builder
   private buildFloatingTabBar() {
     Row() {
-      this.buildFloatingTabItem('时间线', 0, $r('app.media.ic_tab_timeline'));
-      this.buildFloatingTabItem('瞬息', 1, $r('app.media.ic_tab_inspiration'));
-      this.buildFloatingTabItem('回顾', 2, $r('app.media.ic_tab_lookback'));
+      this.buildFloatingTabItem(
+        '时间线',
+        0,
+        $r('app.media.ic_tab_timeline_default'),
+        $r('app.media.ic_tab_timeline_selected')
+      );
+      this.buildFloatingTabItem(
+        '瞬息',
+        1,
+        $r('app.media.ic_tab_inspiration_default'),
+        $r('app.media.ic_tab_inspiration_selected')
+      );
+      this.buildFloatingTabItem(
+        '回顾',
+        2,
+        $r('app.media.ic_tab_lookback_default'),
+        $r('app.media.ic_tab_lookback_selected')
+      );
     }
     .width('92%')
     .height(64)
@@ -324,12 +339,19 @@ struct Index {
   }
 
   @Builder
-  private buildFloatingTabItem(title: string, index: number, icon: Resource) {
+  private buildFloatingTabItem(title: string, index: number, icon: Resource, selectedIcon?: Resource) {
     Column({ space: 2 }) {
-      Image(icon)
-        .width(24)
-        .height(24)
-        .fillColor(this.currentIndex === index ? '#007DFF' : '#99000000')
+      if (selectedIcon) {
+        Image(this.currentIndex === index ? selectedIcon : icon)
+          .width(22)
+          .height(22)
+          .objectFit(ImageFit.Contain)
+      } else {
+        Image(icon)
+          .width(24)
+          .height(24)
+          .fillColor(this.currentIndex === index ? '#007DFF' : '#99000000')
+      }
 
       Text(title)
         .fontSize(10)
