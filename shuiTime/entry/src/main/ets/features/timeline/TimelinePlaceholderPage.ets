@@ -246,7 +246,7 @@ export struct TimelinePlaceholderPage {
     }
     .width('100%')
     .layoutWeight(1)
-    .padding({ left: 20, right: 20, top: 24, bottom: 88 })
+    .padding({ left: 20, right: 20, top: 24, bottom: 16 })
     .scrollBar(BarState.Off);
   }
   @Builder
@@ -262,7 +262,8 @@ export struct TimelinePlaceholderPage {
 
       this.buildTimelineCard(item, this.shouldShowDayHeader(items, index), this.isLastItemOfDay(items, index))
     }
-    .width('100%');
+    .width('100%')
+    .margin({ bottom: index === items.length - 1 ? 72 : 0 });
   }
 
   @Builder
@@ -316,7 +317,7 @@ export struct TimelinePlaceholderPage {
       }
       .layoutWeight(1)
       .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-      .backgroundColor('#FFFFFFE8')
+      .backgroundColor('#FFFFFF')
       .borderRadius(18)
       .shadow({
         radius: 12,
