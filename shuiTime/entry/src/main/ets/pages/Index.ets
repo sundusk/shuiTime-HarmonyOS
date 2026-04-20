@@ -92,7 +92,7 @@ struct Index {
       .hitTestBehavior(HitTestMode.Transparent)
 
       // 全局悬浮球
-      if (!(this.showComposer && this.currentIndex === 0)) {
+      if (this.currentIndex === 0 && !this.showComposer) {
         this.buildGlobalFloatingActionButton();
       }
 
@@ -328,7 +328,7 @@ struct Index {
     .alignItems(VerticalAlign.Center)
     .padding({ left: 8, right: 8, top: 6, bottom: 6 })
     .margin({ bottom: 12 })
-    .backgroundColor('#FFFFFF')
+    .backgroundColor('#80FFFFFF')
     .borderRadius(32)
     .shadow({
       radius: 24,

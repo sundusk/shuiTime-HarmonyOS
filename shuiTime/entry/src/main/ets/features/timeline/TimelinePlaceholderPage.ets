@@ -87,20 +87,20 @@ export struct TimelinePlaceholderPage {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#F8FAFD');
+        .backgroundColor('#EEF4FF');
 
       Circle()
         .width(220)
         .height(220)
-        .fill('#EDF3FF')
-        .opacity(0.9)
+        .fill('#DCE8FF')
+        .opacity(0.92)
         .position({ x: 96, y: 86 });
 
       Circle()
         .width(220)
         .height(220)
-        .fill('#F5F0FF')
-        .opacity(0.9)
+        .fill('#E8F0FF')
+        .opacity(0.88)
         .position({ x: 208, y: 690 });
     }
     .width('100%')
