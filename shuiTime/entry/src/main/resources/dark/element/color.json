@@ -2,7 +2,11 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#000000"
+      "value": "#EEF4FF"
+    },
+    {
+      "name": "app_background_base",
+      "value": "#EEF4FF"
     }
   ]
 }

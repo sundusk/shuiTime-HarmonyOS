@@ -87,7 +87,7 @@ export struct TimelinePlaceholderPage {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#EEF4FF');
+        .backgroundColor($r('app.color.app_background_base'));
 
       Circle()
         .width(220)

@@ -3,6 +3,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 
 const DOMAIN = 0x0000;
+const APP_BACKGROUND_COLOR = '#EEF4FF';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -51,8 +52,8 @@ export default class EntryAbility extends UIAbility {
     try {
       const mainWindow = windowStage.getMainWindowSync();
       const systemBarProperties: window.SystemBarProperties = {
-        statusBarColor: '#F8FAFD',
-        navigationBarColor: '#F8FAFD',
+        statusBarColor: APP_BACKGROUND_COLOR,
+        navigationBarColor: APP_BACKGROUND_COLOR,
         statusBarContentColor: '#1F2430',
         navigationBarContentColor: '#1F2430'
       };

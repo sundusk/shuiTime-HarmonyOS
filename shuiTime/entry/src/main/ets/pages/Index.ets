@@ -68,7 +68,7 @@ struct Index {
       .scrollable(false)
       .barMode(BarMode.Fixed)
       .barHeight(0)
-      .backgroundColor('#F8FAFD')
+      .backgroundColor($r('app.color.app_background_base'))
       .onChange((index: number) => {
         this.currentIndex = index;
         // 切换标签页时关闭输入框
@@ -104,7 +104,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F8FAFD')
+    .backgroundColor($r('app.color.app_background_base'))
   }
 
   @Builder

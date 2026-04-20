@@ -22,7 +22,7 @@ export struct LookbackPlaceholderPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F5F7FA')
+    .backgroundColor($r('app.color.app_background_base'))
   }
 
   @Builder
