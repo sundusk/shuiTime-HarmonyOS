@@ -354,11 +354,17 @@ struct Index {
     .alignItems(VerticalAlign.Center)
     .padding({ left: 8, right: 8, top: 6, bottom: 6 })
     .margin({ bottom: 12 })
-    .backgroundColor('#80FFFFFF')
+    .backgroundColor('#24FFFFFF')
+    .backdropBlur(28)
+    .border({
+      width: 1,
+      color: '#73FFFFFF',
+      radius: 32
+    })
     .borderRadius(32)
     .shadow({
       radius: 24,
-      color: '#18000000',
+      color: '#12000000',
       offsetX: 0,
       offsetY: 8
     })

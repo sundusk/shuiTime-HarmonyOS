@@ -232,7 +232,7 @@ export struct TimelinePlaceholderPage {
     }
     .width('100%')
     .layoutWeight(1)
-    .padding({ left: 16, right: 18, top: 20, bottom: 16 })
+    .padding({ left: 16, right: 18, top: 20, bottom: 2 })
     .scrollBar(BarState.Off);
   }
 
@@ -318,7 +318,14 @@ export struct TimelinePlaceholderPage {
   }
 
   private getItemBottomSpacing(items: TimelineItemEntity[], index: number): number {
-    return index === items.length - 1 ? 18 : 12;
+    return index === items.length - 1 ? this.getLastCardBottomSpacing() : 12;
+  }
+
+  private getLastCardBottomSpacing(): number {
+    const floatingTabBarHeight = 64;
+    const floatingTabBarBottomMargin = 12;
+    const cardClearance = 10;
+    return floatingTabBarHeight + floatingTabBarBottomMargin + cardClearance;
   }
 
   private getConnectorHeight(item: TimelineItemEntity, bottomSpacing: number): number {
