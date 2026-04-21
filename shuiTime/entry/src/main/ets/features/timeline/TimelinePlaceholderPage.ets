@@ -26,7 +26,7 @@ export struct TimelinePlaceholderPage {
         throw new Error('无法获取应用上下文');
       }
       await initializeAppBootstrap(context.filesDir);
-      const loadedItems = await getTimelineRepository().listAll();
+      const loadedItems = await getTimelineRepository().listByDate(this.getTodayStart(), this.getTodayEnd());
       
       loadedItems.sort((a: TimelineItemEntity, b: TimelineItemEntity) => b.timestamp - a.timestamp);
       
@@ -61,7 +61,7 @@ export struct TimelinePlaceholderPage {
 
           Blank()
             .layoutWeight(1);
-        } else if (this.items.length === 0) {
+        } else if (this.getTodayItems(this.items).length === 0) {
           Blank()
             .layoutWeight(3);
 
@@ -70,7 +70,7 @@ export struct TimelinePlaceholderPage {
           Blank()
             .layoutWeight(4);
         } else {
-          this.buildTimelineList(this.items);
+          this.buildTimelineList(this.getTodayItems(this.items));
         }
       }
       .width('100%')
@@ -88,20 +88,6 @@ export struct TimelinePlaceholderPage {
         .width('100%')
         .height('100%')
         .backgroundColor($r('app.color.app_background_base'));
-
-      Circle()
-        .width(220)
-        .height(220)
-        .fill('#DCE8FF')
-        .opacity(0.92)
-        .position({ x: 96, y: 86 });
-
-      Circle()
-        .width(220)
-        .height(220)
-        .fill('#E8F0FF')
-        .opacity(0.88)
-        .position({ x: 208, y: 690 });
     }
     .width('100%')
     .height('100%');
@@ -112,7 +98,7 @@ export struct TimelinePlaceholderPage {
     Row() {
       this.buildCircleActionButton('menu');
 
-      Text('时间线')
+      Text('今日')
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor('#232833');
@@ -241,193 +227,105 @@ export struct TimelinePlaceholderPage {
         ListItem() {
           this.buildTimelineListItem(items, item, index);
         }
-        .id(item.id) // 添加唯一ID帮助ForEach识别变化
+        .id(item.id)
       }, (item: TimelineItemEntity) => item.id)
     }
     .width('100%')
     .layoutWeight(1)
-    .padding({ left: 20, right: 20, top: 24, bottom: 16 })
+    .padding({ left: 16, right: 18, top: 20, bottom: 16 })
     .scrollBar(BarState.Off);
   }
+
   @Builder
   private buildTimelineListItem(items: TimelineItemEntity[], item: TimelineItemEntity, index: number) {
-    Column({ space: 12 }) {
-      if (this.shouldShowDayHeader(items, index)) {
-        Text(this.formatDayLabel(this.getDayKey(item.timestamp)))
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#7F8796')
-          .width('100%');
-      }
-
-      this.buildTimelineCard(item, this.shouldShowDayHeader(items, index), this.isLastItemOfDay(items, index))
-    }
-    .width('100%')
-    .margin({ bottom: index === items.length - 1 ? 72 : 0 });
+    this.buildTimelineCard(
+      item,
+      index > 0,
+      index < items.length - 1,
+      this.getItemBottomSpacing(items, index)
+    );
   }
 
   @Builder
-  private buildTimelineCard(item: TimelineItemEntity, isFirstOfDay: boolean, isLast: boolean) {
-    Row({ space: 12 }) {
+  private buildTimelineCard(
+    item: TimelineItemEntity,
+    showTopLine: boolean,
+    showBottomLine: boolean,
+    bottomSpacing: number
+  ) {
+    Stack({ alignContent: Alignment.TopStart }) {
       Column() {
-        if (isFirstOfDay) {
-          Row() {}
-            .width(2)
-            .height(14)
-            .backgroundColor('#C9DAFF');
-        }
-
-        this.buildTimelineNode(item.type);
-
-        if (!isLast) {
-          Row() {}
-            .width(2)
-            .height(74)
-            .backgroundColor('#C9DAFF');
-        } else {
-          Blank()
-            .height(18);
-        }
-      }
-      .width(22)
-      .alignItems(HorizontalAlign.Center);
-
-      Column({ space: 10 }) {
-        Row() {
-          Text(this.formatTime(item.timestamp))
-            .fontSize(13)
-            .fontColor('#8D96A5');
-
-          Blank();
-
-          Text(this.formatTypeLabel(item.type))
-            .fontSize(11)
-            .fontColor(this.getTypeColor(item.type))
-            .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-            .backgroundColor(this.getTypeBackgroundColor(item.type))
-            .borderRadius(10);
-        }
-        .width('100%');
-
-        Text(this.getDisplayContent(item))
-          .fontSize(16)
-          .fontColor('#1F2430')
-          .lineHeight(23)
+        Text(this.formatTime(item.timestamp))
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#8D96A5')
+          .lineHeight(18)
           .width('100%');
+
+        Column() {
+          Text(this.getDisplayContent(item))
+            .fontSize(16)
+            .fontColor('#1F2430')
+            .lineHeight(23)
+            .width('100%');
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+        .margin({ top: 8 })
+        .backgroundColor('#FFFFFF')
+        .borderRadius(18)
+        .shadow({
+          radius: 12,
+          color: '#12000000',
+          offsetX: 0,
+          offsetY: 6
+        });
       }
-      .layoutWeight(1)
-      .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-      .backgroundColor('#FFFFFF')
-      .borderRadius(18)
-      .shadow({
-        radius: 12,
-        color: '#12000000',
-        offsetX: 0,
-        offsetY: 6
-      });
+      .width('100%')
+      .padding({ left: 32 });
+
+      if (showTopLine) {
+        Row() {}
+          .width(2)
+          .height(4)
+          .backgroundColor('#BFD4FF')
+          .position({ x: 9, y: 0 });
+      }
+      Column() {
+        this.buildTimelineNode()
+      }
+      .position({ x: 4, y: 4 });
+
+      if (showBottomLine) {
+        Row() {}
+          .width(2)
+          .height(this.getConnectorHeight(item, bottomSpacing))
+          .backgroundColor('#BFD4FF')
+          .position({ x: 9, y: 14 });
+      }
     }
     .width('100%')
-    .alignItems(VerticalAlign.Top);
+    .padding({ bottom: bottomSpacing });
   }
-
   @Builder
-  private buildTimelineNode(type: string) {
-    if (type === 'moment') {
-      Stack() {
-        Circle()
-          .width(18)
-          .height(18)
-          .fill('#EAF2FF');
-
-        Circle()
-          .width(18)
-          .height(18)
-          .stroke('#4A7DFF')
-          .strokeWidth(1.5);
-
-        Circle()
-          .width(8)
-          .height(8)
-          .fill('#4A7DFF');
-      }
-      .margin({ top: 4, bottom: 4 });
-    } else {
-      Circle()
-        .width(10)
-        .height(10)
-        .fill(type === 'inspiration' ? '#FFBF47' : '#4A7DFF')
-        .stroke('#F8FAFD')
-        .strokeWidth(2)
-        .margin({ top: 4, bottom: 4 });
-    }
+  private buildTimelineNode() {
+    Circle()
+      .width(10)
+      .height(10)
+      .fill('#3F8CFF')
+      .stroke('#F5F8FF')
+      .strokeWidth(2);
   }
 
-  private shouldShowDayHeader(items: TimelineItemEntity[], index: number): boolean {
-    if (index === 0) {
-      return true;
-    }
-    return this.getDayKey(items[index - 1].timestamp) !== this.getDayKey(items[index].timestamp);
+  private getItemBottomSpacing(items: TimelineItemEntity[], index: number): number {
+    return index === items.length - 1 ? 18 : 12;
   }
 
-  private isLastItemOfDay(items: TimelineItemEntity[], index: number): boolean {
-    if (index >= items.length - 1) {
-      return true;
-    }
-    return this.getDayKey(items[index].timestamp) !== this.getDayKey(items[index + 1].timestamp);
-  }
-
-  private getDayKey(timestamp: number): string {
-    const date = new Date(timestamp);
-    const year = `${date.getFullYear()}`;
-    const month = `${date.getMonth() + 1}`.padStart(2, '0');
-    const day = `${date.getDate()}`.padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  private formatDayLabel(dayKey: string): string {
-    const parts = dayKey.split('-');
-    const year = parts[0];
-    const month = parts[1];
-    const day = parts[2];
-    const date = new Date(Number(year), Number(month) - 1, Number(day));
-    const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
-    const todayKey = this.getDayKey(Date.now());
-
-    if (dayKey === todayKey) {
-      return '今日';
-    }
-
-    return `${year}年${month}月${day}日 ${weekday}`;
-  }
-
-  private formatTypeLabel(type: string): string {
-    if (type === 'moment') {
-      return '瞬影';
-    }
-    if (type === 'inspiration') {
-      return '瞬息';
-    }
-    return '时间线';
-  }
-
-  private getTypeColor(type: string): string {
-    if (type === 'moment') {
-      return '#4A7DFF';
-    }
-    if (type === 'inspiration') {
-      return '#C48912';
-    }
-    return '#4A7DFF';
-  }
-
-  private getTypeBackgroundColor(type: string): string {
-    if (type === 'moment') {
-      return '#EAF1FF';
-    }
-    if (type === 'inspiration') {
-      return '#FFF4D9';
-    }
-    return '#EAF1FF';
+  private getConnectorHeight(item: TimelineItemEntity, bottomSpacing: number): number {
+    const content = this.getDisplayContent(item);
+    const estimatedLineCount = Math.max(1, Math.ceil(content.length / 14));
+    const estimatedCardHeight = 28 + estimatedLineCount * 23;
+    return estimatedCardHeight + bottomSpacing + 16;
   }
 
   private getDisplayContent(item: TimelineItemEntity): string {
@@ -438,6 +336,26 @@ export struct TimelinePlaceholderPage {
       return '图片记录';
     }
     return '空白记录';
+  }
+
+  private getTodayItems(items: TimelineItemEntity[]): TimelineItemEntity[] {
+    const todayStart = this.getTodayStart();
+    const todayEnd = this.getTodayEnd();
+    return items
+      .filter((item: TimelineItemEntity) => item.timestamp >= todayStart && item.timestamp <= todayEnd)
+      .sort((a: TimelineItemEntity, b: TimelineItemEntity) => b.timestamp - a.timestamp);
+  }
+
+  private getTodayStart(): number {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.getTime();
+  }
+
+  private getTodayEnd(): number {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return today.getTime();
   }
 
   private formatTime(timestamp: number): string {
